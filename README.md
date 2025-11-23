@@ -15,7 +15,7 @@
   </a>
 </p>
 
-一个基于 Cloudflare Workers 的现代化 IP 地址收集与测速工具，自动从多个公开来源收集 Cloudflare IP 地址，并提供可视化界面和测速功能。
+一个基于 Cloudflare Workers 的优选 CF IP 地址收集与测速工具，自动从多个公开来源收集 Cloudflare IP 地址，并提供可视化界面和测速功能。
 
 ## 🌟 功能特点
 
