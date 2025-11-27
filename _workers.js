@@ -1,5 +1,6 @@
 // 自定义优质IP数量
 const FAST_IP_COUNT = 25; // 修改这个数字来自定义优质IP数量
+const AUTO_TEST_MAX_IPS = 200; // 自动测速的最大IP数量，避免测速过多导致超时
 
 export default {
     async scheduled(event, env, ctx) {
@@ -1222,17 +1223,17 @@ export default {
     }
   }
   
-  // 自动测速并存储优质IP
+  // 自动测速并存储优质IP - 优化后的逻辑
   async function autoSpeedTestAndStore(env, ips) {
     if (!ips || ips.length === 0) return;
     
     const speedResults = [];
     const BATCH_SIZE = 5; // 控制并发数
     
-    // 只测速前100个IP以提高效率
-    const ipsToTest = ips.slice(0, 100);
+    // 对所有IP进行测速，但限制最大数量避免超时
+    const ipsToTest = ips.slice(0, AUTO_TEST_MAX_IPS);
     
-    console.log(`Starting auto speed test for ${ipsToTest.length} IPs...`);
+    console.log(`Starting auto speed test for ${ipsToTest.length} IPs (out of ${ips.length} total)...`);
     
     for (let i = 0; i < ipsToTest.length; i += BATCH_SIZE) {
       const batch = ipsToTest.slice(i, i + BATCH_SIZE);
@@ -1261,18 +1262,24 @@ export default {
       }
     }
     
-    // 按延迟排序，取前FAST_IP_COUNT个
+    // 按延迟排序，取前FAST_IP_COUNT个最快的IP
     speedResults.sort((a, b) => a.latency - b.latency);
     const fastIPs = speedResults.slice(0, FAST_IP_COUNT);
+    
+    console.log(`Speed test results: ${speedResults.length} IPs tested successfully`);
+    console.log(`Fastest IP: ${fastIPs[0]?.ip} (${fastIPs[0]?.latency}ms)`);
+    console.log(`Slowest fast IP: ${fastIPs[fastIPs.length-1]?.ip} (${fastIPs[fastIPs.length-1]?.latency}ms)`);
     
     // 存储优质IP
     await env.IP_STORAGE.put('cloudflare_fast_ips', JSON.stringify({
       fastIPs: fastIPs,
       lastTested: new Date().toISOString(),
-      count: fastIPs.length
+      count: fastIPs.length,
+      testedCount: speedResults.length,
+      totalIPs: ips.length
     }));
     
-    console.log(`Auto speed test completed. Found ${fastIPs.length} fast IPs.`);
+    console.log(`Auto speed test completed. Found ${fastIPs.length} fast IPs out of ${speedResults.length} tested.`);
   }
   
   // 测试单个IP的速度
@@ -1287,7 +1294,9 @@ export default {
         },
         cf: {
           resolveOverride: ip
-        }
+        },
+        // 设置较短的超时时间
+        signal: AbortSignal.timeout(5000)
       });
       
       if (!response.ok) {
@@ -1553,4 +1562,3 @@ export default {
       }
     });
   }
-  
